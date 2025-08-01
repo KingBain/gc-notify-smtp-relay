@@ -4,9 +4,9 @@ import requests
 import ipaddress
 
 from aiosmtpd.controller import Controller
-from mailparser import parse_from_bytes
-from markdownify import markdownify as md
 from notifications_python_client.notifications import NotificationsAPIClient
+
+from message_handling import parse_email
 
 SMTP_HOSTNAME = os.getenv("SMTP_HOSTNAME", "127.0.0.1")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 2525))
@@ -37,32 +37,24 @@ class NotifyHandler:
             print(f"Source IP {source_ip} is not private, skipping email processing")
             return "550 Source IP unacceptable"
 
-        parsed = parse_from_bytes(envelope.content)
-
-        # Prefer plain text, fallback to HTML -> Markdown
-        if parsed.text_plain:
-            body = "\n\n".join(parsed.text_plain)
-        elif parsed.text_html:
-            body = md(parsed.text_html[0])
-        else:
-            body = "(empty message)"
-
-        subject = parsed.subject or "(no subject)"
-
-        recipients = []
-        if parsed.to:
-            recipients.extend([addr for _, addr in parsed.to])
-        if parsed.cc:
-            recipients.extend([addr for _, addr in parsed.cc])
-        if parsed.bcc:
-            recipients.extend([addr for _, addr in parsed.bcc])
+        parsed = parse_email(envelope.content)
+        recipients = parsed.get("recipients", [])
+        subject = parsed.get("subject", None)
+        body = parsed.get("body", None)
 
         if not recipients:
             return "550 No recipient found"
 
+        if not subject or not body:
+            return "550 Invalid email content"
+
         errors = 0
         try:
             for to in recipients:
+                to = to.strip()
+                if not to:
+                    continue
+
                 if SLACK_WEBHOOK_URL:
                     slack_payload = {
                         "to": to,
