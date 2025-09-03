@@ -6,11 +6,14 @@ on:
       - main
   workflow_dispatch:
 
-permissions: write-all
+permissions: read-all
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -26,7 +29,7 @@ jobs:
         run: |
           # Force everything to lowercase
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_ID=ghcr.io/$OWNER/gcnotify-smtp-relay
+          IMAGE_ID=ghcr.io/$OWNER/govuk-notify-smtp-relay
           VERSION=latest
           echo "Building $IMAGE_ID:$VERSION"
           docker build . --tag $IMAGE_ID:$VERSION
